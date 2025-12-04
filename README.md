@@ -28,10 +28,14 @@ First you need to fill the contact form wait for the download link. Download the
 
 ```
 python data_prepare_DALES.py
-this .ply files are converted to .txt files
-python DALES_sample_generation_vectorized.py  #this is much faster than the previous version [it used to take 7hrs, with this 1hr]
-.txt files are subsampled and converted to .npy files. Which is used in the train._DALES.py
+
+python DALES_sample_generation_vectorized.py
+
 ```
+#data_prepare_DALES.py -> Here, .ply files are converted to .txt files
+
+#DALES_sample_generation_vectorized.py --. is much faster than the previous version [it used to take 7hrs, with this in 1hr]
+.txt files are subsampled and converted to .npy files. Which is used in the train._DALES.py
 
 2. Model Training
 
