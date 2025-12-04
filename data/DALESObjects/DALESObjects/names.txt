@@ -1,0 +1,8 @@
+ground
+vegetation
+cars
+trucks
+powerlines
+fences
+poles
+buildings
