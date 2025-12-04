@@ -11,7 +11,7 @@ Segmentation of point clouds is foundational to numerous remote sensing applicat
 ## Install
 The latest codes are tested on CUDA11.3 and above, PyTorch 1.10.1 and Python 3.9.
 
-NOTE: Encountered issues with CUDA 11.3 and 11.7 while installing some dependacies and packages. Safe with CUDA 12.3
+NOTE: Encountered issues with CUDA 11.3 and 11.7 while installing some dependecies and packages. Safe with CUDA 12.3
 
 We do not need to compile mamba or cpp_wrapper from the previous model
 For mamba, it is installed through 3dumamba_environment.yml [mamba-ssm==1.2.0.post1]
