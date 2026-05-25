@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Enhanced inference + evaluation (Thesis-ready)
+Enhanced inference + evaluation 
 Your original code preserved + evaluation added
 """
 import os
@@ -44,6 +44,29 @@ def compute_iou(gt, pred):
         denom = tp+fp+fn
         ious.append(tp/denom if denom>0 else 0)
     return np.array(ious)
+
+def update_global_confusion(confusion, gt, pred):
+    mask = (gt >= 0) & (gt < NUM_CLASSES) & (pred >= 0) & (pred < NUM_CLASSES)
+    encoded = gt[mask] * NUM_CLASSES + pred[mask]
+    confusion += np.bincount(encoded, minlength=NUM_CLASSES * NUM_CLASSES).reshape(NUM_CLASSES, NUM_CLASSES)
+
+def metrics_from_confusion(confusion):
+    tp = np.diag(confusion).astype(np.float64)
+    gt_count = confusion.sum(axis=1).astype(np.float64)
+    pred_count = confusion.sum(axis=0).astype(np.float64)
+    union = gt_count + pred_count - tp
+    iou = np.divide(tp, union, out=np.zeros_like(tp), where=union > 0)
+    oa = float(tp.sum() / confusion.sum()) if confusion.sum() else 0.0
+    return {
+        "mIoU": float(np.mean(iou)),
+        "OA": oa,
+        "IoU": iou,
+        "gt_points": gt_count.astype(np.int64),
+        "pred_points": pred_count.astype(np.int64),
+        "correct_points": tp.astype(np.int64),
+        "union_points": union.astype(np.int64),
+        "total_points": int(confusion.sum()),
+    }
 
 # ---------------- ORIGINAL FUNCTIONS (UNCHANGED) ----------------
 def strip_module_prefix(state_dict):
@@ -139,10 +162,11 @@ def main():
     load_checkpoint(args.checkpoint, classifier, device)
     classifier.eval()
 
-    npy_files = glob.glob(os.path.join(args.data_root, "*.npy"))
+    npy_files = sorted(glob.glob(os.path.join(args.data_root, "*.npy")))
 
     room_metrics = []
     confusion = ConfusionMatrix(num_classes=NUM_CLASSES, labels=CLASSES)
+    global_confusion = np.zeros((NUM_CLASSES, NUM_CLASSES), dtype=np.int64)
 
     for npy_path in npy_files:
         print(f"[INFO] Processing {npy_path}")
@@ -191,6 +215,7 @@ def main():
         rgb = np.concatenate(all_rgb)
         gts = np.concatenate(all_gt)
         preds = np.concatenate(all_pred)
+        update_global_confusion(global_confusion, gts.astype(np.int64), preds.astype(np.int64))
 
         # -------- NEW: METRICS --------
         iou = compute_iou(gts, preds)
@@ -219,6 +244,56 @@ def main():
 
     summary = df.mean(numeric_only=True)
     summary.to_csv(os.path.join(args.output_dir,"apartment_summary.csv"))
+
+    # -------- GLOBAL POINT-LEVEL METRICS --------
+    # apartment_summary.csv above is the historical room-wise mean.
+    # These files are computed from one confusion matrix over all points.
+    global_metrics = metrics_from_confusion(global_confusion)
+    global_summary = {
+        "metric_type": "global_point_level",
+        "num_rooms": len(npy_files),
+        "num_points": global_metrics["total_points"],
+        "mIoU": global_metrics["mIoU"],
+        "OA": global_metrics["OA"],
+    }
+    for i, cls in enumerate(CLASSES):
+        global_summary[f"IoU_{cls}"] = float(global_metrics["IoU"][i])
+
+    pd.DataFrame([global_summary]).to_csv(
+        os.path.join(args.output_dir, "global_point_summary.csv"),
+        index=False,
+    )
+
+    pd.Series(
+        {
+            "mIoU": global_metrics["mIoU"],
+            "accuracy": global_metrics["OA"],
+            **{cls: float(global_metrics["IoU"][i]) for i, cls in enumerate(CLASSES)},
+        }
+    ).to_csv(os.path.join(args.output_dir, "apartment_summary_global.csv"))
+
+    pd.DataFrame(
+        [
+            {
+                "class": cls,
+                "IoU": float(global_metrics["IoU"][i]),
+                "gt_points": int(global_metrics["gt_points"][i]),
+                "pred_points": int(global_metrics["pred_points"][i]),
+                "correct_points": int(global_metrics["correct_points"][i]),
+                "union_points": int(global_metrics["union_points"][i]),
+            }
+            for i, cls in enumerate(CLASSES)
+        ]
+    ).to_csv(os.path.join(args.output_dir, "global_point_class_iou.csv"), index=False)
+
+    pd.DataFrame(global_confusion, index=CLASSES, columns=CLASSES).to_csv(
+        os.path.join(args.output_dir, "global_point_confusion_matrix.csv"),
+        index_label="GT/PRED",
+    )
+
+    print("\n========== GLOBAL POINT-LEVEL SUMMARY ==========")
+    print(f"Global mIoU: {global_metrics['mIoU']:.6f}")
+    print(f"Global OA: {global_metrics['OA']:.6f}")
 
     # -------- NEW: PLOTS --------
     plt.figure()
