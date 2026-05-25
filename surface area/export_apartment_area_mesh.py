@@ -15,7 +15,7 @@ from typing import List, Tuple
 import numpy as np
 from plyfile import PlyData, PlyElement
 
-from room_size_test import load_ply, write_area_mesh_ply
+from room_surface_area_batch import load_ply, write_area_mesh_ply
 
 
 MODEL_FOLDERS = {
