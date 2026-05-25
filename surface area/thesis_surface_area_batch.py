@@ -336,208 +336,16 @@ def fmt(value: object, digits: int = 3) -> str:
     return str(value)
 
 
-def latex_escape(text: object) -> str:
-    return str(text).replace("_", "\\_").replace("%", "\\%")
-
-
-def latex_table(rows: List[Dict[str, object]], columns: List[str], caption: str, label: str) -> str:
-    header = " & ".join(latex_escape(c) for c in columns) + r" \\"
-    body = []
-    for row in rows:
-        body.append(" & ".join(latex_escape(fmt(row.get(c, ""))) for c in columns) + r" \\")
-    colspec = "l" * len(columns)
-    return (
-        "\\begin{table}[htbp]\n"
-        "\\centering\n"
-        "\\scriptsize\n"
-        f"\\caption{{{latex_escape(caption)}}}\n"
-        f"\\label{{{label}}}\n"
-        "\\resizebox{\\textwidth}{!}{%\n"
-        f"\\begin{{tabular}}{{{colspec}}}\n"
-        "\\toprule\n"
-        f"{header}\n"
-        "\\midrule\n"
-        + "\n".join(body)
-        + "\n\\bottomrule\n"
-        "\\end{tabular}\n"
-        "}\n"
-        "\\end{table}\n"
-    )
-
-
-def write_latex_report(
-    output_path: Path,
-    apartment_rows: List[Dict[str, object]],
-    metric_comparison: List[Dict[str, object]],
-    surface_comparison: List[Dict[str, object]],
-) -> None:
-    """Write an organized LaTeX report summarizing methods and outputs."""
-    baseline_rows = [r for r in apartment_rows if r["model"] == BASELINE_NAME]
-    baseline_table_rows = [
-        {
-            "apartment": r["apartment"],
-            "pred_ceiling_area_m2": r["pred_ceiling_area_m2"],
-            "gt_ceiling_area_m2": r["gt_ceiling_area_m2"],
-            "real_ceiling_area_m2": "",
-            "pred_floor_area_m2": r["pred_floor_area_m2"],
-            "gt_floor_area_m2": r["gt_floor_area_m2"],
-            "real_floor_area_m2": "",
-            "pred_wall_area_m2": r["pred_wall_area_m2"],
-            "gt_wall_area_m2": r["gt_wall_area_m2"],
-            "real_wall_area_m2": "",
-            "mIoU": r.get("mIoU", ""),
-        }
-        for r in baseline_rows
-    ]
-
-    metric_short = [r for r in metric_comparison if r["metric"] in ("mIoU", "accuracy", "ceiling", "floor", "wall")]
-    surface_pred = [r for r in surface_comparison if r["area_source"] == "pred"]
-
-    content = r"""\documentclass[11pt,a4paper]{article}
-\usepackage[margin=2.2cm]{geometry}
-\usepackage{booktabs}
-\usepackage{longtable}
-\usepackage{array}
-\usepackage{hyperref}
-\usepackage{graphicx}
-\usepackage{siunitx}
-\title{Surface Area Estimation from Semantic Point-Cloud Segmentation on TUB-CSE}
-\author{}
-\date{\today}
-\begin{document}
-\maketitle
-
-\begin{abstract}
-This report summarizes a semantic point-cloud workflow for estimating ceiling,
-floor, and wall surface areas from TUB-CSE apartment scans. Areas are computed
-from predicted labels, while ground-truth labels are used only for evaluation.
-The report compares a pretrained S3DIS model against the same model after
-fine-tuning on TUB-CSE training apartments D1, D3, and D5, with D2 and D4 used
-as test apartments.
-\end{abstract}
-
-\section{Methodology}
-The input to the area estimator is a room-level PLY containing XYZ coordinates,
-ground-truth labels, and predicted labels. The measurement pipeline uses only
-the predicted labels. Ceiling, floor, and wall predictions are extracted as
-classes 0, 1, and 2. Floor and ceiling candidates are filtered with constrained
-RANSAC plane fitting. The floor is required to be near-horizontal and close to
-the lowest predicted floor reference. The ceiling is required to be at least
-1.8 m above the predicted floor reference, while allowing moderately sloped
-planes. This rejects low furniture patches that are incorrectly predicted as
-ceiling. The accepted points are projected into local plane coordinates, where
-Delaunay triangulation is computed and filtered with an alpha-shape radius. The
-area is the sum of accepted triangle areas.
-
-For walls, predicted wall points are segmented into vertical planes by fitting
-2D wall lines in the XY plane. Each wall plane is unfolded into local coordinates
-defined by distance along the wall and vertical height. The same Delaunay plus
-alpha-shape area calculation is applied per wall plane and summed over all
-detected wall planes. The wall estimate is therefore a visible predicted wall
-surface area.
-
-\section{Literature Review}
-The semantic segmentation setting follows the indoor 3D scene understanding
-problem established by S3DIS. Point-based neural networks such as PointNet and
-PointNet++ demonstrated direct learning on unordered point sets. RANSAC is a
-standard robust estimator for geometric primitives in noisy data. Delaunay
-triangulation and alpha shapes provide a practical basis for converting sparse
-surface samples into concave surface footprints. The present workflow combines
-semantic segmentation with these classical geometric estimators so that
-architectural quantities can be derived from predicted classes.
-
-\section{Experiments}
-Two result sets were evaluated. The folder \texttt{results} corresponds to the
-pretrained S3DIS model. The folder \texttt{results\_after\_FT} corresponds to the
-pretrained S3DIS model after fine-tuning on TUB-CSE apartments D1, D3, and D5.
-Apartment-level metrics are read from the existing \texttt{apartment\_summary.csv}
-files. Surface areas are recomputed from each room PLY and aggregated by
-apartment.
-
-\section{Results}
-"""
-    content += latex_table(
-        baseline_table_rows,
-        [
-            "apartment",
-            "pred_ceiling_area_m2",
-            "gt_ceiling_area_m2",
-            "real_ceiling_area_m2",
-            "pred_floor_area_m2",
-            "gt_floor_area_m2",
-            "real_floor_area_m2",
-            "pred_wall_area_m2",
-            "gt_wall_area_m2",
-            "real_wall_area_m2",
-            "mIoU",
-        ],
-        "Apartment-level surface areas from the pretrained S3DIS result folder, with blank columns reserved for real measurements.",
-        "tab:s3dis_apartment_surface_areas",
-    )
-    content += latex_table(
-        metric_short,
-        ["apartment", "metric", "s3dis_pretrained", "after_finetune", "delta_ft_minus_s3dis"],
-        "D2 and D4 test-apartment metric comparison between pretrained S3DIS and fine-tuned models.",
-        "tab:test_metric_comparison",
-    )
-    content += latex_table(
-        surface_pred,
-        ["apartment", "surface", "s3dis_pretrained_area_m2", "after_finetune_area_m2", "delta_ft_minus_s3dis_m2", "delta_percent"],
-        "D2 and D4 predicted surface-area comparison between pretrained S3DIS and fine-tuned models.",
-        "tab:test_surface_comparison",
-    )
-    content += r"""
-\section{Discussion}
-The ceiling and floor estimates are more stable than wall estimates because
-large structural planes are easier to constrain geometrically. Wall areas are
-more sensitive to curtains, furniture close to walls, doors, and windows. The
-fine-tuned model should be judged both by semantic IoU and by the downstream
-surface-area error against GT-derived area estimates. The blank real-measurement
-columns in Table~\ref{tab:s3dis_apartment_surface_areas} are intended for manual
-or survey-grade measurements, which should be treated as the final external
-reference.
-
-\section{Evaluation}
-Evaluation is reported in two complementary ways. First, segmentation quality is
-measured with mIoU, accuracy, and class IoU from the existing metrics files.
-Second, geometric utility is evaluated by comparing predicted surface areas with
-GT-label-derived surface areas using the same geometric estimator. This keeps the
-area comparison fair: prediction and GT labels are passed through the same
-mathematical pipeline.
-
-\section{Output Files}
-The generated CSV files contain room-level areas, apartment-level areas,
-apartment metrics, D2/D4 metric comparisons, and D2/D4 surface-area comparisons.
-All files are written to \texttt{THESIS SURFACE AREA RESULTS}.
-
-\begin{thebibliography}{9}
-\bibitem{armeni2016}
-I. Armeni et al., ``3D Semantic Parsing of Large-Scale Indoor Spaces,'' CVPR, 2016.
-\bibitem{qi2017pointnet}
-C. R. Qi et al., ``PointNet: Deep Learning on Point Sets for 3D Classification and Segmentation,'' CVPR, 2017.
-\bibitem{qi2017pointnetpp}
-C. R. Qi et al., ``PointNet++: Deep Hierarchical Feature Learning on Point Sets in a Metric Space,'' NeurIPS, 2017.
-\bibitem{fischler1981}
-M. A. Fischler and R. C. Bolles, ``Random Sample Consensus,'' Communications of the ACM, 1981.
-\bibitem{edelsbrunner1983}
-H. Edelsbrunner, D. Kirkpatrick, and R. Seidel, ``On the Shape of a Set of Points in the Plane,'' IEEE Transactions on Information Theory, 1983.
-\end{thebibliography}
-
-\end{document}
-"""
-    output_path.write_text(content)
-
 
 def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.report_only:
+    if args.rread:
         apartment_rows = read_csv_rows(args.output_dir / "apartment_surface_areas_all_models.csv")
         metric_comparison = read_csv_rows(args.output_dir / "D2_D4_metric_comparison_s3dis_vs_ft.csv")
         surface_comparison = read_csv_rows(args.output_dir / "D2_D4_surface_area_comparison_s3dis_vs_ft.csv")
-        write_latex_report(args.output_dir / "thesis_surface_area_report.tex", apartment_rows, metric_comparison, surface_comparison)
-        print(f"Regenerated LaTeX report in: {args.output_dir}")
+        print(f"done: {args.output_dir}")
         return
 
     tables = build_tables(args)
@@ -556,9 +364,7 @@ def main() -> None:
     write_csv(args.output_dir / "apartment_metrics_all_models.csv", metric_rows)
     write_csv(args.output_dir / "D2_D4_metric_comparison_s3dis_vs_ft.csv", metric_comparison)
     write_csv(args.output_dir / "D2_D4_surface_area_comparison_s3dis_vs_ft.csv", surface_comparison)
-    write_latex_report(args.output_dir / "thesis_surface_area_report.tex", apartment_rows, metric_comparison, surface_comparison)
 
-    print(f"Wrote thesis surface-area results to: {args.output_dir}")
     print(f"Rooms processed: {len(room_rows)}")
     print(f"Apartment/model rows: {len(apartment_rows)}")
 
