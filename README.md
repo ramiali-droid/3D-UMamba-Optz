@@ -6,7 +6,24 @@ This is a Pytorch implementation of 3D-UMamba.
 
 ## Abtract
 
-Segmentation of point clouds is foundational to numerous remote sensing applications. Recently, the development of Transformers has further improved segmentation techniques thanks to their great long-range context modeling capability. However, Transformers have quadratic complexity in inference time and memory, which both limits the input size and poses a strict hardware requirement. This paper presents a novel 3D-UMamba network with linear complexity, which is the earliest to introduce the Selective State Space Model (i.e., Mamba) to multi-source LiDAR point cloud processing. 3D-UMamba integrates Mamba into the classic U-Net architecture, presenting outstanding global context modeling with high efficiency and achieving an effective combination of local and global information. In addition, we propose a simple yet efficient 3D-token serialization approach (Voxel-based Token Serialization, i.e., VTS) for Mamba, where the Bi-Scanning strategy enables the model to collect features from all input points in different directions effectively. The performance of 3D-UMamba on three challenging LiDAR point cloud datasets (airborne MultiSpectral LiDAR (MS-LiDAR), aerial DALES, and vehicle-mounted Toronto-3D) demonstrated its superiority in multi-source LiDAR point cloud semantic segmentation, as well as the strong adaptability of Mamba to different types of LiDAR data, exceeding current state-of-the-art models. Ablation studies demonstrated the higher efficiency and lower memory costs of 3D-UMamba than its Transformer-based counterparts.
+ the state-of-the-art 3D-UMamba framework for in-
+door LiDAR semantic segmentation and evaluates the relationship between segmentation
+quality and the reliability of structural geometric assessment. A unified preprocessing
+pipeline was developed for the DALES, S3DIS, and TU-CSE datasets, and the original
+3D-UMamba framework was successfully reproduced and adapted for indoor semantic
+segmentation. Transfer learning from the S3DIS benchmark indoor domain to the TU-
+CSE residential environment was investigated using zero-shot inference, training from
+scratch, and fine-tuning.
+The reproduced model achieved competitive benchmark performance on the S3DIS
+dataset, obtaining an mIoU of 82.8%, outperforming the methods included in the bench-
+mark comparison. On the TU-CSE residential dataset, fine-tuning consistently improved
+semantic segmentation performance compared with both zero-shot transfer and train-
+ing from scratch, demonstrating the effectiveness of transferring learned representations
+from benchmark indoor datasets to residential environments with limited labelled data.
+The predicted ceiling, floor, and wall classes were subsequently extracted for automated
+surface-area estimation. Validation against manually annotated point clouds and Revit-
+derived models showed low relative surface-area errors, while mesh visualisations con-
+firmed the successful extraction of the primary structural component
 
 
 ## Install
