@@ -63,7 +63,7 @@ python train_DALES.py --model mamba_msg --log_dir 3dumamba --learning_rate 0.01 
 ```
 
 Note: Saving the pretrained model (https://drive.google.com/file/d/1U6TJYdRg77uNhLRPg4WJ9UeTx__y3aIz/view?usp=drive_link) in log/dales_seg/3dumamba/checkpoints, to get better results.
-#### I could not find such pretrained model, but it is totally ok to train from scratch and get the same result.
+#### If could not find such pretrained model, it is totally ok to train from scratch and get the same result.
 
 
 ## Acknowledgement
